@@ -1,5 +1,7 @@
 # Recovery Challenge Answers
 
+## Please find my scripts at https://github.com/TNDC2002/compress_sensing_assignments in case .py files are corrupted or not uploadable.
+
 ## Problem Setup
 
 Given:
