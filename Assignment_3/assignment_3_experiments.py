@@ -42,11 +42,12 @@ class ExperimentConfig:
 
 
 def dct_matrix(n: int) -> Array:
-    return dct(np.eye(n), type=2, norm="ortho")
+    # Match homework hint: DCT applied along columns (axis=0).
+    return dct(np.eye(n), type=2, norm="ortho", axis=0)
 
 
 def idct_matrix(n: int) -> Array:
-    return idct(np.eye(n), type=2, norm="ortho")
+    return idct(np.eye(n), type=2, norm="ortho", axis=0)
 
 
 def recover_bp(A: Array, y: Array) -> Array:
@@ -151,7 +152,7 @@ def generate_freq_sparse(n: int, s: int, rng: np.random.Generator) -> Tuple[Arra
     alpha = np.zeros(n, dtype=float)
     supp = rng.choice(n, size=s, replace=False)
     alpha[supp] = rng.standard_normal(s)
-    x = idct(alpha, type=2, norm="ortho")
+    x = idct(alpha, type=2, norm="ortho", axis=0)
     return x, alpha
 
 
