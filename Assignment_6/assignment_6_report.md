@@ -80,38 +80,22 @@ python Assignment_6/assignment_6_issue2_robust_outliers.py
 
 ---
 
-## Issue 3: Selfies and outlier rejection
+## Issue 3: Selfies, outlier rejection, and gallery enrollment
 
-### Preprocessing
+**Data:** `selfy/` (8), `friend_selfies/` (3). New subject ID: **class 39**.
 
-Eight selfies in `selfy/`: grayscale, face crop (Haar + fallback), resize to **96×84**, match Yale mean/std.
+| Phase | What we do | Main result |
+|-------|------------|-------------|
+| **1** | Yale only; test my selfies | **0/8** as class 39 (forced Yale labels) |
+| **2** | Outlier gate | My **8/8** + friend **3/3** rejected |
+| **3** | Add 5 train selfies as class 39 | 1214-atom dictionary |
+| **4** | Test held-out + friend | My test **3/3** pred. 39 (**2/3** accepted); friend **3/3** rejected |
 
-![Preprocessed selfies](preprocessed_selfies_grid.png)
+![My preprocessed selfies](preprocessed_selfies_grid.png)
 
-### Can SRC recognize you?
+![Friend's preprocessed selfies](preprocessed_friend_selfies_grid.png)
 
-**No.** Raw SRC forces a Yale label (often class 38) with poor fit (\(r_1 \approx 0.92\)–\(0.95\), \(r_2/r_1 \approx 1\)). You are not among the 38 training identities.
-
-### Outlier-rejection gate
-
-Reject as **unknown** if any holds (thresholds from 200 Yale test faces, 95th percentile):
-
-| Test | Meaning |
-|------|---------|
-| \(r_{(1)} > \tau_{\mathrm{res}}\) | No class fits well |
-| \(r_{(2)}/r_{(1)} < \tau_{\mathrm{ratio}}\) | Ambiguous winner |
-| \(\|y - A\alpha\|_2 > \tau_{\mathrm{total}}\) | Poor reconstruction |
-| concentration \(< \tau_{\mathrm{conc}}\) | Coefficients not focused on one class |
-
-### Results
-
-| Probe | Count | Accepted | Rejected |
-|-------|------:|---------:|---------:|
-| Selfies (unknown) | 8 | 0 | **8** |
-| Yale friend (in DB) | 1 | **1** | 0 (true class 20) |
-| Yale validation | 200 | 173 | 27 (86.5%) |
-
-Combined: **100%** selfie rejection; friend correctly accepted.
+Full write-up: `assignment_6_issue3_report.md`.
 
 ```bash
 python Assignment_6/assignment_6_issue3_selfies.py --calibration-max 200

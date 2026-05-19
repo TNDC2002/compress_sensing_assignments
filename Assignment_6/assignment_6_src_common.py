@@ -119,14 +119,20 @@ def class_indices(column_labels: Array) -> Dict[int, Array]:
     return mapping
 
 
-def build_dictionary(X: Array, train_idx: Array, train_labels: Array) -> TrainingDictionary:
-    A = l2_normalize_columns(X[:, train_idx])
+def build_dictionary_from_matrix(X_train: Array, column_labels: Array) -> TrainingDictionary:
+    """Build SRC dictionary from columns of X_train (n_pixels x n_atoms)."""
+    A = l2_normalize_columns(X_train)
+    labels = np.asarray(column_labels, dtype=int).ravel()
     return TrainingDictionary(
         A=A,
-        column_labels=train_labels,
+        column_labels=labels,
         gram=A.T @ A,
-        class_to_cols=class_indices(train_labels),
+        class_to_cols=class_indices(labels),
     )
+
+
+def build_dictionary(X: Array, train_idx: Array, train_labels: Array) -> TrainingDictionary:
+    return build_dictionary_from_matrix(X[:, train_idx], train_labels)
 
 
 def solve_lasso_ista(

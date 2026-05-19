@@ -26,9 +26,9 @@
 \begin{abstract}
 We implement Sparse Representation Classification (SRC) on the cropped Extended Yale Face Database~B,
 extend it to corrupted test images via a robust sparse-outlier model, and evaluate preprocessing plus
-outlier rejection on personal selfies. On a stratified 50/50 train--test split, standard SRC achieves
+outlier rejection on my selfies and my friend's selfies (out-of-gallery probes). On a stratified 50/50 train--test split, standard SRC achieves
 \textbf{91.1\%} accuracy. Robust SRC improves patch-corruption performance at moderate corruption levels,
-while a residual-based rejection gate correctly flags out-of-gallery selfies.
+while a four-phase enrollment experiment shows rejection before gallery update and recognition afterward.
 \end{abstract}
 
 \section{Introduction}
@@ -144,74 +144,81 @@ Figure~\ref{fig:corruption} plots accuracy versus corruption percentage for stan
   \item \textbf{Cost:} robust coding is $\approx 4$--$5\times$ slower per image due to the augmented optimization.
 \end{itemize}
 
-\section{Issue 3: Selfies and Outlier Rejection}
+\section{Issue 3: Selfies, Outlier Rejection, and Gallery Enrollment}
 
-\subsection{Preprocessing}
-
-Eight selfies (\texttt{selfy/}) are converted to Yale-style chips:
-grayscale, EXIF correction, Haar face detection (with fallback crop), resize to $96\times 84$,
-and intensity matching to database mean/std ($\mu\approx 69.5$, $\sigma\approx 62.7$).
+\noindent\textbf{Data:} \texttt{selfy/} (8), \texttt{friend\_selfies/} (3). New subject ID: class~39.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.92\textwidth]{preprocessed_selfies_grid.png}
-  \caption{Preprocessed selfies in Yale~B format ($96\times 84$ grayscale).}
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{preprocessed_selfies_grid.png}
+    \caption{My selfies}
+  \end{subfigure}\hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{preprocessed_friend_selfies_grid.png}
+    \caption{Friend's selfies}
+  \end{subfigure}
+  \caption{Preprocessed probes ($96\times 84$, Yale-style).}
   \label{fig:selfies}
 \end{figure}
 
-\subsection{Recognition attempt}
+\subsection{Phase 1: Yale-only gallery (me not enrolled)}
 
-Training uses only the $38$ Yale subjects. After preprocessing, \textbf{raw SRC still assigns a Yale ID}
-(typically class~38) because it must pick the smallest residual among in-gallery candidates.
-However, fit quality is poor: $r_1\approx 0.92$--$0.95$, $r_2/r_1\approx 1$, and sparsity concentration
-$\approx 0.04$--$0.06$. \textbf{You are not recognized as yourself}---there is no matching subject.
+Dictionary: 1209 Yale training faces (38 classes). Test all my selfies.
 
-\subsection{Outlier-rejection strategy}
+\textbf{Can SRC recognize me?} \textbf{No.} Every selfie receives a forced Yale label (e.g.\ 38, 11, 28), never class~39, with $r_1\approx 0.92$--$0.95$.
 
-Declare \emph{unknown} if any test fails (thresholds calibrated on $200$ in-database Yale test faces,
-95th-percentile envelopes):
-\begin{align}
-  r_{(1)} &> \tau_{\mathrm{res}}, &
-  \frac{r_{(2)}}{r_{(1)}} &< \tau_{\mathrm{ratio}}, \\
-  \|y-A\hat{\alpha}\|_2 &> \tau_{\mathrm{total}}, &
-  c(\hat{\alpha}) &< \tau_{\mathrm{conc}},
-\end{align}
-where $r_{(1)}\le r_{(2)}\le\cdots$ are sorted class residuals and $c(\hat{\alpha})$ is the fraction of
-$\ell_1$ mass on the winning class.
+\subsection{Phase 2: Outlier-rejection gate}
+
+Reject as \emph{unknown} if $r_{(1)}>\tau_{\mathrm{res}}$, $r_{(2)}/r_{(1)}<\tau_{\mathrm{ratio}}$, $\|y-A\hat\alpha\|_2>\tau_{\mathrm{total}}$, or concentration $<\tau_{\mathrm{conc}}$ (thresholds from 200 in-gallery Yale test faces). Results: my selfies \textbf{8/8} rejected; friend's selfies \textbf{3/3} rejected.
+
+\subsection{Phase 3: Add me to gallery and retrain}
+
+Append 5 of my selfies to the dictionary as class~39 (3 held out for test). Rebuild $A$ with 1214 atoms (1209 Yale + 5 mine). Friend never added.
+
+\subsection{Phase 4: Test after enrollment}
 
 \begin{table}[htbp]
   \centering
-  \caption{Issue 3: outlier gate evaluation.}
+  \caption{Issue 3: four-phase pipeline results (from \texttt{issue3\_pipeline\_results.csv}).}
   \label{tab:issue3}
-  \begin{tabular}{lcccc}
+  \small
+  \begin{tabular}{clp{6.2cm}c}
     \toprule
-    Probe & Count & Accepted & Rejected & Notes \\
+    Phase & Probe set & Measured outcome & Result \\
     \midrule
-    Selfies (unknown) & 8 & 0 & 8 & all \textsc{Unknown} \\
-    Yale friend (in DB) & 1 & 1 & 0 & true class 20, pred.\ 20 \\
-    Yale validation & 200 & 173 & 27 & 86.5\% acceptance \\
+    1 & My selfies (8) & Recognized as class~39? & 0/8 \\
+    1 & My selfies (8) & Raw SRC labels (examples) & 38, 11, 28 \\
+    2 & My selfies (8) & Rejected as \textsc{Unknown} & 8/8 \\
+    2 & Friend's selfies (3) & Rejected as \textsc{Unknown} & 3/3 \\
+    3 & --- & Gallery update (5 train, 3 test for class~39) & 1214 atoms \\
+    4 & My test selfies (3 held out) & Predicted class~39 & 3/3 \\
+    4 & My test selfies (3 held out) & Gate accepted (in-gallery) & 2/3 \\
+    4 & My train selfies (5 in dict.) & Predicted class~39; accepted & 5/5; 5/5 \\
+    4 & Friend's selfies (3) & Rejected as \textsc{Unknown} & 3/3 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\noindent\textbf{Friend probe.} A held-out Yale test image simulates a friend \emph{in} the database:
-$r_1\approx 0.77$, $r_2/r_1\approx 1.21$, concentration $\approx 0.18$---clear inlier.
+\noindent\textbf{Notes.} Phase~1: no outlier gate yet; SRC assigns nearest Yale IDs ($r_1\approx 0.92$--$0.95$).
+Phase~4: $r_1$ drops to $\approx 0.81$--$0.86$ for my probes. One held-out test image is still rejected by the conservative gate (label still 39).
+One friend image gets raw label~39 in Phase~4 but is still rejected (not enrolled).
 
 \subsection{Observations}
 
 \begin{enumerate}
-  \item Preprocessing is necessary but not sufficient: selfies must match scale and format, yet remain
-  out-of-gallery.
-  \item SRC alone has no reject option; unknown users are mislabeled to the nearest subject.
-  \item Residual and concentration statistics separate inliers from identity outliers better than raw labels.
-  \item Patch corruption (Issue~2) differs from identity outliers (Issue~3): the latter should be rejected,
-  not classified.
+  \item Without enrollment, SRC mislabels me as a nearest Yale subject.
+  \item The outlier gate rejects unknown identities before enrollment.
+  \item After adding my training selfies, I am recognized as class~39.
+  \item Friend's selfies are still rejected in Phase~4.
 \end{enumerate}
 
 \section{Conclusion}
 
 We built a complete SRC pipeline on Yale~B (\textbf{91.1\%} accuracy), extended it with robust sparse outliers
-for corrupted tests, and demonstrated preprocessing plus threshold-based rejection for personal selfies.
+for corrupted tests, and completed the Issue~3 pipeline: Yale-only test, outlier gate, gallery enrollment (class~39), and friend rejection after retraining.
 Together, these experiments show both the strength of sparse representation for in-database faces and the
 need for explicit outlier modeling when the probe may not belong to any training class.
 

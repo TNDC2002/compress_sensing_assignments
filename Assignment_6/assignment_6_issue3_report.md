@@ -1,92 +1,97 @@
-# Assignment 6 Report — Issue 3: Selfies and Outlier Rejection
+# Assignment 6 — Issue 3: Selfies, Gallery Extension, and Outlier Rejection
 
-## Goal
+**Data:** my selfies `selfy/` (8), friend's selfies `friend_selfies/` (3).  
+**My gallery ID after enrollment:** class **39** (new subject, not in original Yale B).
 
-1. Preprocess personal selfies to match cropped Yale B format (`96 × 84` grayscale).
-2. Test whether SRC recognizes you after preprocessing.
-3. Design and demonstrate an **outlier-rejection** rule (“person not in database”).
-4. Evaluate on an **extended database**: Yale B training gallery + appended selfie probes (unknown identities).
+This report follows the full pipeline: test without me → outlier gate → add me and retrain → test me and friend again.
 
-Selfies used: `Assignment_6/selfy/*.jpg` (8 images).
+---
 
-## Preprocessing
+## Phase 1 — Train on Yale only (me NOT in database)
 
-Pipeline (`preprocess_selfie_to_yale` in `assignment_6_src_common.py`):
+**Setup:** Dictionary built from **1209** Yale training faces (38 subjects). My selfies are **not** in the gallery.
 
-1. Grayscale + EXIF orientation correction.
-2. **Face detection** (OpenCV Haar cascade) with padding; fallback to centered upper-body crop.
-3. Resize to **96 × 84** (Lanczos).
-4. Match first-order statistics to Yale B: scale to database mean/std (`≈ 69.5`, `≈ 62.7`).
+**Question: Can SRC recognize me?**
 
-Outputs:
+| Result | Detail |
+|--------|--------|
+| **No** | Every selfie gets a forced Yale label (e.g. 38, 11, 28), never class 39 |
+| Fit quality | \(r_1 \approx 0.92\)–\(0.95\), \(r_2/r_1 \approx 1\) — poor, ambiguous |
 
-- Per-image chips: `preprocessed_selfies/*_yale.png`
-- Montage: `preprocessed_selfies_grid.png`
+SRC always picks the nearest Yale subject; that is **not** recognition of me.
 
-## Recognition without outlier rejection
+---
 
-Training: standard SRC dictionary from **1209** Yale training faces (38 subjects), same split as Issue 1 (`seed = 0`, 50/50 per class).
+## Phase 2 — Outlier-rejection mechanism
 
-| Observation | Result |
-|-------------|--------|
-| Raw SRC label on selfies | Almost always **forced** to some Yale ID (often class 38) |
-| True identity in gallery? | **No** — you are not among the 38 subjects |
-| Meaningful “recognition”? | **No** — low-quality fit to the nearest Yale subject |
+**Goal:** Declare *person not in database* when sparse coding fit is poor or ambiguous.
 
-Even after preprocessing, selfies do **not** correspond to a subject in the database. SRC still returns a label because it must choose the smallest class residual among the 38 candidates.
+**Calibration:** Thresholds from **200** in-gallery Yale test faces (95th-percentile):
 
-Typical selfie SRC features (all 8 probes):
+- \(\tau_{\mathrm{res}} \approx 0.927\), \(\tau_{\mathrm{ratio}} \approx 1.003\), \(\tau_{\mathrm{total}} \approx 0.409\), \(\tau_{\mathrm{conc}} \approx 0.054\)
 
-- Minimum class residual `r₁ ≈ 0.92–0.95` (poor fit).
-- Residual ratio `r₂/r₁ ≈ 1.00–1.01` (two classes fit equally poorly → ambiguous).
-- Low sparsity concentration (`≈ 0.04–0.06`): coefficients spread across many training identities.
+**Reject** if any: \(r_{(1)} > \tau_{\mathrm{res}}\), \(r_{(2)}/r_{(1)} < \tau_{\mathrm{ratio}}\), \(\|y-A\hat\alpha\|_2 > \tau_{\mathrm{total}}\), or concentration \(< \tau_{\mathrm{conc}}\).
 
-## Outlier-rejection strategy
+**Demo (Yale-only gallery, extended probes = my selfies):**
 
-After sparse coding, compute per-class residuals `r_k` (standard SRC) and global fit statistics. **Reject** (declare *unknown*) if any of the following holds:
+| Probe | Rejected as unknown |
+|-------|--------------------:|
+| My selfies (8) | **8/8** |
+| Friend's selfies (3) | **3/3** |
 
-| Test | Intuition |
-|------|-----------|
-| `r₁ > τ_res` | No class reconstructs the face well. |
-| `r₂/r₁ < τ_ratio` | Winner is not clearly better than runner-up. |
-| `‖y − Aα‖₂ > τ_total` | Overall reconstruction is poor. |
-| sparsity concentration `< τ_conc` | L1 mass not focused on one identity. |
+The gate correctly flags everyone who is **not** in the 38-subject Yale gallery.
 
-Thresholds `{τ_res, τ_ratio, τ_total, τ_conc}` are calibrated on **in-database** Yale test faces (200 images, 95th-percentile envelopes) so most true subjects are accepted.
+---
 
-Implementation: `calibrate_outlier_thresholds`, `is_outlier` in `assignment_6_src_common.py`.
+## Phase 3 — Add me to the database and retrain
 
-## Demonstration on extended database
+**Setup:** Append **5** of my selfies to the training dictionary as **class 39**; **3** held out for testing. Rebuild \(A\) with **1214** atoms (1209 Yale + 5 mine).
 
-**Setup**
+Friend's images are **never** added to training.
 
-- Gallery: Yale B train split (38 classes).
-- Unknown probes: 8 preprocessed selfies (label 39 conceptually — not used in training).
-- In-database probe (“friend”): one **held-out Yale test** image (`yale_test_1200`, true class **20**) simulating a friend who *is* in the database.
+---
 
-**Calibrated thresholds (95th percentile, 200 validation faces)**
+## Phase 4 — Test after enrollment
 
-- `r₁ ≤ 0.927`
-- `r₂/r₁ ≥ 1.003`
-- `‖y − Aα‖₂ ≤ 0.409`
-- concentration `≥ 0.054`
+**Calibration:** Thresholds from Yale test faces + my **test** selfies (all in-gallery).
 
-**Gate results**
+### My selfies (now in gallery)
 
-| Probe type | Count | Accepted | Rejected | Notes |
-|------------|------:|---------:|---------:|-------|
-| Selfies (unknown) | 8 | 0 | **8** | All declared **UNKNOWN** |
-| Yale friend (in DB) | 1 | **1** | 0 | Predicted class **20** (correct) |
-| Yale validation (in DB) | 200 | 173 | 27 | **86.5%** acceptance |
+| Split | Count | Predicted class 39 | Accepted (not rejected) |
+|-------|------:|-------------------:|------------------------:|
+| Test (held out) | 3 | **3/3** | **2/3** |
+| Train (in dictionary) | 5 | **5/5** | **5/5** |
 
-Combined gate: **100%** unknown rejection on selfies, friend accepted, overall gate accuracy **87.1%** on the mixed evaluation set.
+After enrollment, SRC **recognizes me** as class **39** with much lower residuals (\(r_1 \approx 0.81\)–\(0.86\)) than in Phase 1. One held-out test image is still rejected by the conservative gate (\(r_1\) borderline); label is still correct.
+
+### Friend's selfies (still NOT in gallery)
+
+| Result |
+|--------|
+| **3/3 rejected** as unknown |
+
+Even when raw SRC occasionally picks class 39 for a friend image, the **outlier gate still rejects** — friend is not treated as enrolled.
+
+---
+
+## Pipeline summary
+
+| Phase | Gallery | Probe | Outcome |
+|-------|---------|-------|---------|
+| 1 | 38 Yale only | My selfies (8) | **0/8** recognized as class 39; forced Yale labels (38, 11, 28, …) |
+| 2 | 38 Yale only | My selfies (8) | **8/8** rejected as unknown |
+| 2 | 38 Yale only | Friend's selfies (3) | **3/3** rejected as unknown |
+| 3 | + class 39 (5 train, 3 test) | — | Dictionary rebuilt: **1214** atoms |
+| 4 | Extended | My test (3 held out) | **3/3** pred. class 39; **2/3** gate accepted |
+| 4 | Extended | My train (5 in dict.) | **5/5** pred. class 39; **5/5** accepted |
+| 4 | Extended | Friend's selfies (3) | **3/3** rejected (one raw label 39, still rejected) |
 
 ## Observations
 
-1. **Preprocessing is necessary but not sufficient.** Selfies must be grayscale, aligned, and resized; without this, SRC inputs are out of distribution. Even with preprocessing, you are still not a Yale subject.
-2. **SRC alone always assigns a label.** Minimum-residual classification has no “none of the above” option; unknown users are mislabeled to the nearest Yale identity.
-3. **Outliers are detectable from SRC statistics.** Unknown faces show **high** `r₁`, **low** `r₂/r₁`, and **low** concentration — different from in-database test faces (friend probe: `r₁ ≈ 0.77`, `r₂/r₁ ≈ 1.21`, concentration `≈ 0.18`).
-4. **Patch corruptions vs identity outliers.** Issue 2 corruption hurts accuracy but faces remain in-gallery; Issue 3 selfies are **structurally out-of-database** and are better handled by rejection than by forcing a class label.
+1. **Without enrollment**, SRC cannot recognize me; it only forces a Yale neighbor.
+2. **Outlier rejection** handles unknown identities before enrollment.
+3. **After adding my training selfies**, I am recognized as class 39 with clearly better residuals.
+4. **Friend remains unknown** in Phase 4 — reject mechanism still works.
 
 ## Reproduce
 
@@ -95,4 +100,4 @@ cd Assignment_6
 python assignment_6_issue3_selfies.py --calibration-max 200
 ```
 
-Outputs: `issue3_selfie_probe_results.csv`, `issue3_outlier_gate_summary.csv`, preprocessed images under `preprocessed_selfies/`.
+Outputs: `issue3_pipeline_results.csv`, `issue3_pipeline_summary.csv`, preprocessed image grids.

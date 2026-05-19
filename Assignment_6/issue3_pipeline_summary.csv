@@ -1,0 +1,10 @@
+metric,value
+my_class_id,39
+my_train_count,5
+my_test_count,3
+friend_test_count,3
+phase2_my_rejected,8
+phase2_friend_rejected,3
+phase4_my_test_correct_class,3
+phase4_my_test_accepted,2
+phase4_friend_rejected,3
