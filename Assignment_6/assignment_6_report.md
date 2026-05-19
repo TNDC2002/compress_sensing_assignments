@@ -63,16 +63,17 @@ Classify from \(\alpha\) using the same SRC residual rule.
 
 ### Results
 
+Evaluated on **150** test images; corruption levels 0–50% (`robust_outlier_results.csv`).
+
 ![Random pixel corruption](accuracy_vs_corruption_pixel.png)
 
 ![Random patch corruption](accuracy_vs_corruption_patch.png)
 
 ### Observations
 
-- **Pixels:** both methods degrade gradually; performance is similar.
-- **Patches:** more harmful; robust SRC can beat standard SRC at moderate \(p\) (explicit \(e\) models localized outliers).
-- **High \(p\):** both collapse when corruption dominates the signal.
-- Robust SRC is ~4–5× slower per image.
+- **Pixels:** similar at low \(p\); robust SRC wins at **30%** (82.0% vs 77.3%) and **50%** (57.3% vs 52.7%).
+- **Patches:** much harsher; methods tie near **20%** (64%); both collapse by **50%** (~35–39%).
+- Robust SRC is ~2–3× slower per image in this run.
 
 ```bash
 python Assignment_6/assignment_6_issue2_robust_outliers.py
