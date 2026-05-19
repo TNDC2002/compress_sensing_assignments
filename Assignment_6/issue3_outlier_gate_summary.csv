@@ -1,0 +1,13 @@
+metric,value
+max_min_residual,0.9266690777609107
+min_residual_ratio,1.0029731638345103
+max_total_residual,0.4091961777311909
+min_sparsity_concentration,0.05381998617546552
+selfies_rejected,8
+selfies_total,8
+friend_accepted,1
+friend_true_class,20
+friend_raw_predicted,20
+in_db_accept_rate_percent,86.56716417910448
+unknown_reject_rate_percent,100.0
+overall_gate_accuracy_percent,87.08133971291866

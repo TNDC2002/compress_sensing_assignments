@@ -1,0 +1,13 @@
+corruption_kind,corruption_frac,method,accuracy_percent,elapsed_sec
+pixel,0.0000,standard_src,92.5000,21.682
+pixel,0.0000,robust_src,90.0000,96.951
+pixel,0.2000,standard_src,90.0000,18.936
+pixel,0.2000,robust_src,90.0000,91.214
+pixel,0.4000,standard_src,75.0000,20.372
+pixel,0.4000,robust_src,72.5000,90.286
+patch,0.0000,standard_src,92.5000,18.782
+patch,0.0000,robust_src,90.0000,90.069
+patch,0.2000,standard_src,62.5000,18.509
+patch,0.2000,robust_src,67.5000,90.289
+patch,0.4000,standard_src,50.0000,19.053
+patch,0.4000,robust_src,42.5000,90.735
